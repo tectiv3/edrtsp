@@ -189,6 +189,7 @@ func NewPusher(session *Session) (pusher *Pusher) {
 }
 
 func (pusher *Pusher) bindSession(session *Session) {
+	pusher.Logger().Println("bindSession")
 	pusher.Session = session
 	session.RTPHandles = append(session.RTPHandles, func(pack *RTPPack) {
 		if session != pusher.Session {
@@ -271,7 +272,7 @@ func (pusher *Pusher) Start() {
 			}
 			continue
 		}
-		logger.Printf("Pack type: %d", pack.Type)
+
 		if pusher.gopCacheEnable && pack.Type == RTP_TYPE_VIDEO {
 			pusher.gopCacheLock.Lock()
 			if rtp := ParseRTP(pack.Buffer.Bytes()); rtp != nil && pusher.shouldSequenceStart(rtp) {

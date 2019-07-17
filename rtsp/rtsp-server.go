@@ -47,6 +47,19 @@ func (server *Server) Start() (err error) {
 		return
 	}
 
+	go func() {
+		select {
+		case pusher, addChnOk := <-server.addPusherCh:
+			if addChnOk {
+				logger.Printf("Pusher Added, path: %s\n", pusher.Path())
+			}
+		case pusher, removeChnOk := <-server.removePusherCh:
+			if removeChnOk {
+				logger.Printf("Pusher Removed, path: %s\n", pusher.Path())
+			}
+		}
+	}()
+
 	server.Stoped = false
 	server.TCPListener = listener
 	logger.Println("rtsp server start on", server.TCPPort)
@@ -111,9 +124,8 @@ func (server *Server) AddPusher(pusher *Pusher) bool {
 		}
 		added = false
 	}
-	logger.Println("Unlock pushers")
+
 	if added {
-		logger.Println("starting pusher")
 		go pusher.Start()
 		server.addPusherCh <- pusher
 	}
