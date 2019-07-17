@@ -253,6 +253,7 @@ func (pusher *Pusher) QueueRTP(pack *RTPPack) *Pusher {
 
 func (pusher *Pusher) Start() {
 	logger := pusher.Logger()
+	logger.Println("Pusher start")
 	for !pusher.Stoped() {
 		var pack *RTPPack
 		pusher.cond.L.Lock()
@@ -270,7 +271,7 @@ func (pusher *Pusher) Start() {
 			}
 			continue
 		}
-
+		logger.Printf("Pack type: %d", pack.Type)
 		if pusher.gopCacheEnable && pack.Type == RTP_TYPE_VIDEO {
 			pusher.gopCacheLock.Lock()
 			if rtp := ParseRTP(pack.Buffer.Bytes()); rtp != nil && pusher.shouldSequenceStart(rtp) {

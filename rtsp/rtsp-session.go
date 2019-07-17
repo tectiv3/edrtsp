@@ -37,7 +37,7 @@ func (st SessionType) String() string {
 	case SESSION_TYPE_PLAYER:
 		return "player"
 	}
-	return "unknow"
+	return "unknown"
 }
 
 type RTPType int
@@ -60,7 +60,7 @@ func (rt RTPType) String() string {
 	case RTP_TYPE_VIDEOCONTROL:
 		return "video control"
 	}
-	return "unknow"
+	return "unknown"
 }
 
 type TransType int
@@ -77,7 +77,7 @@ func (tt TransType) String() string {
 	case TRANS_TYPE_UDP:
 		return "UDP"
 	}
-	return "unknow"
+	return "unknown"
 }
 
 const UDP_BUF_SIZE = 1048576
@@ -240,7 +240,7 @@ func (session *Session) Start() {
 					Buffer: rtpBuf,
 				}
 			default:
-				logger.Printf("unknow rtp pack type, %v", pack.Type)
+				logger.Printf("unknown rtp pack type, %v", pack.Type)
 				continue
 			}
 			if pack == nil {
@@ -255,36 +255,36 @@ func (session *Session) Start() {
 			reqBuf := bytes.NewBuffer(nil)
 			reqBuf.Write(buf1)
 			for !session.Stoped {
-				if line, isPrefix, err := session.connRW.ReadLine(); err != nil {
+				line, isPrefix, err := session.connRW.ReadLine()
+				if err != nil {
 					logger.Println(err)
 					return
-				} else {
-					reqBuf.Write(line)
-					if !isPrefix {
-						reqBuf.WriteString("\r\n")
-					}
-					if len(line) == 0 {
-						req := NewRequest(reqBuf.String())
-						if req == nil {
-							break
-						}
-						session.InBytes += reqBuf.Len()
-						contentLen := req.GetContentLength()
-						session.InBytes += contentLen
-						if contentLen > 0 {
-							bodyBuf := make([]byte, contentLen)
-							if n, err := io.ReadFull(session.connRW, bodyBuf); err != nil {
-								logger.Println(err)
-								return
-							} else if n != contentLen {
-								logger.Printf("read rtsp request body failed, expect size[%d], got size[%d]", contentLen, n)
-								return
-							}
-							req.Body = string(bodyBuf)
-						}
-						session.handleRequest(req)
+				}
+				reqBuf.Write(line)
+				if !isPrefix {
+					reqBuf.WriteString("\r\n")
+				}
+				if len(line) == 0 {
+					req := NewRequest(reqBuf.String())
+					if req == nil {
 						break
 					}
+					session.InBytes += reqBuf.Len()
+					contentLen := req.GetContentLength()
+					session.InBytes += contentLen
+					if contentLen > 0 {
+						bodyBuf := make([]byte, contentLen)
+						if n, err := io.ReadFull(session.connRW, bodyBuf); err != nil {
+							logger.Println(err)
+							return
+						} else if n != contentLen {
+							logger.Printf("read rtsp request body failed, expect size[%d], got size[%d]", contentLen, n)
+							return
+						}
+						req.Body = string(bodyBuf)
+					}
+					session.handleRequest(req)
+					break
 				}
 			}
 		}
@@ -370,19 +370,19 @@ func (session *Session) handleRequest(req *Request) {
 		session.connRW.Flush()
 		session.connWLock.Unlock()
 		session.OutBytes += len(outBytes)
+		logger.Printf("Method: %s, type: %d", req.Method, session.Type)
 		switch req.Method {
-		case "PLAY":
+		case "PLAY", "RECORD":
 			switch session.Type {
 			case SESSION_TYPE_PLAYER:
 				session.Pusher.AddPlayer(session.Player)
 			}
-		case "RECORD":
-			logger.Println("Session type RECORD!")
-			switch session.Type {
-			case SESSION_TYPE_PUSHER:
-				logger.Println("Add pusher")
-				session.Server.AddPusher(session.Pusher)
-			}
+			// logger.Println("Session type RECORD!")
+			// switch session.Type {
+			// case SESSION_TYPE_PUSHER:
+			// 	logger.Println("Add pusher")
+			// 	session.Server.AddPusher(session.Pusher)
+			// }
 		case "TEARDOWN":
 			{
 				session.Stop()
@@ -521,16 +521,16 @@ func (session *Session) handleRequest(req *Request) {
 		// a=control:rtsp://192.168.1.64/trackID=1
 		// 例3：
 		// a=control:?ctype=video
-		setupUrl, err := url.Parse(req.URL)
+		setupURL, err := url.Parse(req.URL)
 		if err != nil {
 			res.StatusCode = 500
 			res.Status = "Invalid URL"
 			return
 		}
-		if setupUrl.Port() == "" {
-			setupUrl.Host = fmt.Sprintf("%s:554", setupUrl.Host)
+		if setupURL.Port() == "" {
+			setupURL.Host = fmt.Sprintf("%s:554", setupURL.Host)
 		}
-		setupPath := setupUrl.String()
+		setupPath := setupURL.String()
 
 		// error status. SETUP without ANNOUNCE or DESCRIBE.
 		if session.Pusher == nil {
@@ -541,32 +541,32 @@ func (session *Session) handleRequest(req *Request) {
 		//setupPath = setupPath[strings.LastIndex(setupPath, "/")+1:]
 		vPath := ""
 		if strings.Index(strings.ToLower(session.VControl), "rtsp://") == 0 {
-			vControlUrl, err := url.Parse(session.VControl)
+			vControlURL, err := url.Parse(session.VControl)
 			if err != nil {
 				res.StatusCode = 500
 				res.Status = "Invalid VControl"
 				return
 			}
-			if vControlUrl.Port() == "" {
-				vControlUrl.Host = fmt.Sprintf("%s:554", vControlUrl.Host)
+			if vControlURL.Port() == "" {
+				vControlURL.Host = fmt.Sprintf("%s:554", vControlURL.Host)
 			}
-			vPath = vControlUrl.String()
+			vPath = vControlURL.String()
 		} else {
 			vPath = session.VControl
 		}
 
 		aPath := ""
 		if strings.Index(strings.ToLower(session.AControl), "rtsp://") == 0 {
-			aControlUrl, err := url.Parse(session.AControl)
+			aControlURL, err := url.Parse(session.AControl)
 			if err != nil {
 				res.StatusCode = 500
 				res.Status = "Invalid AControl"
 				return
 			}
-			if aControlUrl.Port() == "" {
-				aControlUrl.Host = fmt.Sprintf("%s:554", aControlUrl.Host)
+			if aControlURL.Port() == "" {
+				aControlURL.Host = fmt.Sprintf("%s:554", aControlURL.Host)
 			}
-			aPath = aControlUrl.String()
+			aPath = aControlURL.String()
 		} else {
 			aPath = session.AControl
 		}

@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	gitCommitCode string
-	buildDateTime string
+	GitCommitCode string
+	BuildDateTime string
 )
 
 type program struct {
@@ -50,7 +50,7 @@ func (p *program) StartRTSP() (err error) {
 		sport = fmt.Sprintf(":%d", p.rtspPort)
 	}
 	link := fmt.Sprintf("rtsp://%s%s", localIP(), sport)
-	log.Println("rtsp server start -->", link)
+	log.Println("rtsp server started -->", link)
 	go func() {
 		if err := p.rtspServer.Start(); err != nil {
 			log.Println("start rtsp server error", err)
@@ -69,6 +69,13 @@ func (p *program) StopRTSP() (err error) {
 	return
 }
 
+type stream struct {
+	URL               string `gorm:"type:varchar(256);primary_key;unique"`
+	CustomPath        string `gorm:"type:varchar(256)"`
+	IdleTimeout       int
+	HeartbeatInterval int
+}
+
 func (p *program) Start() (err error) {
 	log.Println("********** START **********")
 	if isPortInUse(p.rtspPort) {
@@ -80,39 +87,44 @@ func (p *program) Start() (err error) {
 
 	log.SetOutput(os.Stdout)
 
-	// go func() {
-	//     log.Printf("demon pull streams")
-	//     for {
-	//         var streams []string
-	//
-	//         for i := len(streams) - 1; i > -1; i-- {
-	//             v := streams[i]
-	//             agent := fmt.Sprintf("EasyDarwinGo/%s", routers.BuildVersion)
-	//             if routers.BuildDateTime != "" {
-	//                 agent = fmt.Sprintf("%s(%s)", agent, routers.BuildDateTime)
-	//             }
-	//             client, err := rtsp.NewRTSPClient(rtsp.GetServer(), v.URL, int64(v.HeartbeatInterval)*1000, agent)
-	//             if err != nil {
-	//                 continue
-	//             }
-	//             client.CustomPath = v.CustomPath
-	//
-	//             pusher := rtsp.NewClientPusher(client)
-	//             if rtsp.GetServer().GetPusher(pusher.Path()) != nil {
-	//                 continue
-	//             }
-	//             err = client.Start(time.Duration(v.IdleTimeout) * time.Second)
-	//             if err != nil {
-	//                 log.Printf("Pull stream err :%v", err)
-	//                 continue
-	//             }
-	//             rtsp.GetServer().AddPusher(pusher)
-	//             //streams = streams[0:i]
-	//             //streams = append(streams[:i], streams[i+1:]...)
-	//         }
-	//         time.Sleep(10 * time.Second)
-	//     }
-	// }()
+	go func() {
+		streams := []stream{}
+		log.Printf("demon pull streams %d\n", len(streams))
+		for {
+			// streams = append(streams, stream{
+			// 	"rtsp://localhost:554/roi",
+			// 	"roi",
+			// 	1,
+			// 	10,
+			// })
+			for i := len(streams) - 1; i > -1; i-- {
+				v := streams[i]
+				agent := fmt.Sprintf("edrtsp/%s", "0.0.1")
+				if BuildDateTime != "" {
+					agent = fmt.Sprintf("%s(%s)", agent, BuildDateTime)
+				}
+				client, err := rtsp.NewRTSPClient(rtsp.GetServer(), v.URL, int64(v.HeartbeatInterval)*1000, agent)
+				if err != nil {
+					continue
+				}
+				client.CustomPath = v.CustomPath
+
+				pusher := rtsp.NewClientPusher(client)
+				if rtsp.GetServer().GetPusher(pusher.Path()) != nil {
+					continue
+				}
+				err = client.Start(time.Duration(v.IdleTimeout) * time.Second)
+				if err != nil {
+					log.Printf("Pull stream err :%v", err)
+					continue
+				}
+				rtsp.GetServer().AddPusher(pusher)
+				//streams = streams[0:i]
+				//streams = append(streams[:i], streams[i+1:]...)
+			}
+			time.Sleep(10 * time.Second)
+		}
+	}()
 	return
 }
 
@@ -127,8 +139,8 @@ func main() {
 	log.SetPrefix("[edrtsp] ")
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 
-	log.Printf("git commit code:%s", gitCommitCode)
-	log.Printf("build date:%s", buildDateTime)
+	log.Printf("git commit code:%s", GitCommitCode)
+	log.Printf("build date:%s", BuildDateTime)
 
 	rtspServer := rtsp.GetServer()
 	p := &program{
