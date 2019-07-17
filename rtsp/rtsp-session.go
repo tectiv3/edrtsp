@@ -448,6 +448,7 @@ func (session *Session) handleRequest(req *Request) {
 		}
 		addPusher := false
 		if session.closeOld {
+			logger.Println("trying to attach to pusher")
 			r, _ := session.Server.TryAttachToPusher(session)
 			if r < -1 {
 				logger.Printf("reject pusher.")
@@ -479,6 +480,7 @@ func (session *Session) handleRequest(req *Request) {
 			addPusher = true
 		}
 		if addPusher {
+			logger.Println("adding new pusher")
 			session.Pusher = NewPusher(session)
 			addedToServer := session.Server.AddPusher(session.Pusher)
 			if !addedToServer {

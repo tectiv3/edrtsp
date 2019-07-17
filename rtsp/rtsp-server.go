@@ -48,14 +48,16 @@ func (server *Server) Start() (err error) {
 	}
 
 	go func() {
-		select {
-		case pusher, addChnOk := <-server.addPusherCh:
-			if addChnOk {
-				logger.Printf("Pusher Added, path: %s\n", pusher.Path())
-			}
-		case pusher, removeChnOk := <-server.removePusherCh:
-			if removeChnOk {
-				logger.Printf("Pusher Removed, path: %s\n", pusher.Path())
+		for {
+			select {
+			case pusher, addChnOk := <-server.addPusherCh:
+				if addChnOk {
+					logger.Printf("Pusher Added, path: %s\n", pusher.Path())
+				}
+			case pusher, removeChnOk := <-server.removePusherCh:
+				if removeChnOk {
+					logger.Printf("Pusher Removed, path: %s\n", pusher.Path())
+				}
 			}
 		}
 	}()

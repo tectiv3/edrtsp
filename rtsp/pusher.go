@@ -313,6 +313,7 @@ func (pusher *Pusher) GetPlayers() (players map[string]*Player) {
 
 func (pusher *Pusher) AddPlayer(player *Player) *Pusher {
 	logger := pusher.Logger()
+	logger.Println("AddPlayer")
 	if pusher.gopCacheEnable {
 		pusher.gopCacheLock.RLock()
 		for _, pack := range pusher.gopCache {

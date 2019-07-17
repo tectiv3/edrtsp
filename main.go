@@ -92,7 +92,7 @@ func (p *program) Start() (err error) {
 		log.Printf("demon pull streams %d\n", len(streams))
 		for {
 			// streams = append(streams, stream{
-			// 	"rtsp://localhost:554/roi",
+			// 	"rtsp://localhost:8554/roi",
 			// 	"roi",
 			// 	1,
 			// 	10,
