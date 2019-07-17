@@ -1,0 +1,6 @@
+.vscode
+/logs
+/*.log
+.idea
+.DS_Store
+edrtsp
