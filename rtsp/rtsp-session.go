@@ -27,14 +27,14 @@ type SessionType int
 
 const (
 	SESSION_TYPE_PUSHER SessionType = iota
-	SESSEION_TYPE_PLAYER
+	SESSION_TYPE_PLAYER
 )
 
 func (st SessionType) String() string {
 	switch st {
 	case SESSION_TYPE_PUSHER:
 		return "pusher"
-	case SESSEION_TYPE_PLAYER:
+	case SESSION_TYPE_PLAYER:
 		return "player"
 	}
 	return "unknow"
@@ -354,13 +354,14 @@ func (session *Session) handleRequest(req *Request) {
 	//	session.Conn.SetDeadline(time.Now().Add(time.Duration(session.Timeout) * time.Second))
 	//}
 	logger := session.logger
+	logger.Println("handleRequest")
 	logger.Printf("<<<\n%s", req)
 	res := NewResponse(200, "OK", req.Header["CSeq"], session.ID, "")
 	defer func() {
 		if p := recover(); p != nil {
-			logger.Printf("handleRequest err ocurs:%v", p)
+			logger.Printf("handleRequest panic ocurs:%v", p)
 			res.StatusCode = 500
-			res.Status = fmt.Sprintf("Inner Server Error, %v", p)
+			res.Status = fmt.Sprintf("Internal Server Error, %v", p)
 		}
 		logger.Printf(">>>\n%s", res)
 		outBytes := []byte(res.String())
@@ -370,12 +371,17 @@ func (session *Session) handleRequest(req *Request) {
 		session.connWLock.Unlock()
 		session.OutBytes += len(outBytes)
 		switch req.Method {
-		case "PLAY", "RECORD":
+		case "PLAY":
 			switch session.Type {
-			case SESSEION_TYPE_PLAYER:
+			case SESSION_TYPE_PLAYER:
 				session.Pusher.AddPlayer(session.Player)
-				// case SESSION_TYPE_PUSHER:
-				// 	session.Server.AddPusher(session.Pusher)
+			}
+		case "RECORD":
+			logger.Println("Session type RECORD!")
+			switch session.Type {
+			case SESSION_TYPE_PUSHER:
+				logger.Println("Add pusher")
+				session.Server.AddPusher(session.Pusher)
 			}
 		case "TEARDOWN":
 			{
@@ -424,6 +430,7 @@ func (session *Session) handleRequest(req *Request) {
 			return
 		}
 		session.Path = url.Path
+		logger.Printf("Session path %s\n", url.Path)
 
 		session.SDPRaw = req.Body
 		session.SDPMap = ParseSDP(req.Body)
@@ -481,7 +488,7 @@ func (session *Session) handleRequest(req *Request) {
 			}
 		}
 	case "DESCRIBE":
-		session.Type = SESSEION_TYPE_PLAYER
+		session.Type = SESSION_TYPE_PLAYER
 		session.URL = req.URL
 
 		url, err := url.Parse(req.URL)
@@ -585,7 +592,7 @@ func (session *Session) handleRequest(req *Request) {
 			session.TransType = TRANS_TYPE_UDP
 			// no need for tcp timeout.
 			session.Conn.timeout = 0
-			if session.Type == SESSEION_TYPE_PLAYER && session.UDPClient == nil {
+			if session.Type == SESSION_TYPE_PLAYER && session.UDPClient == nil {
 				session.UDPClient = &UDPClient{
 					Session: session,
 				}
@@ -597,7 +604,7 @@ func (session *Session) handleRequest(req *Request) {
 			}
 			logger.Printf("Parse SETUP req.TRANSPORT:UDP.Session.Type:%d,control:%s, AControl:%s,VControl:%s", session.Type, setupPath, aPath, vPath)
 			if setupPath == aPath || aPath != "" && strings.LastIndex(setupPath, aPath) == len(setupPath)-len(aPath) {
-				if session.Type == SESSEION_TYPE_PLAYER {
+				if session.Type == SESSION_TYPE_PLAYER {
 					session.UDPClient.APort, _ = strconv.Atoi(udpMatchs[1])
 					session.UDPClient.AControlPort, _ = strconv.Atoi(udpMatchs[3])
 					if err := session.UDPClient.SetupAudio(); err != nil {
@@ -625,7 +632,7 @@ func (session *Session) handleRequest(req *Request) {
 					ts = strings.Join(tss, ";")
 				}
 			} else if setupPath == vPath || vPath != "" && strings.LastIndex(setupPath, vPath) == len(setupPath)-len(vPath) {
-				if session.Type == SESSEION_TYPE_PLAYER {
+				if session.Type == SESSION_TYPE_PLAYER {
 					session.UDPClient.VPort, _ = strconv.Atoi(udpMatchs[1])
 					session.UDPClient.VControlPort, _ = strconv.Atoi(udpMatchs[3])
 					if err := session.UDPClient.SetupVideo(); err != nil {

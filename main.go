@@ -45,7 +45,7 @@ func (p *program) StartRTSP() (err error) {
 		err = fmt.Errorf("RTSP Server Not Found")
 		return
 	}
-	sport := ""
+	sport := ":554"
 	if p.rtspPort != 554 {
 		sport = fmt.Sprintf(":%d", p.rtspPort)
 	}
@@ -55,7 +55,7 @@ func (p *program) StartRTSP() (err error) {
 		if err := p.rtspServer.Start(); err != nil {
 			log.Println("start rtsp server error", err)
 		}
-		log.Println("rtsp server end")
+		log.Println("rtsp server stopped")
 	}()
 	return
 }
