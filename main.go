@@ -1,46 +1,70 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
-	"net"
+	"net/http"
 	"os"
 	"time"
 
+	"github.com/tectiv3/edrtsp/api"
 	"github.com/tectiv3/edrtsp/rtsp"
+	"github.com/tectiv3/edrtsp/utils"
 )
 
 var (
+	// GitCommitCode auto set on build
 	GitCommitCode string
+	// BuildDateTime auto set on build
 	BuildDateTime string
+	// BuildVersion version
+	BuildVersion = "v0.1.1"
 )
 
 type program struct {
+	httpPort   int
+	httpServer *http.Server
 	rtspPort   int
 	rtspServer *rtsp.Server
 }
 
-func localIP() string {
-	ip := ""
-	if addrs, err := net.InterfaceAddrs(); err == nil {
-		for _, addr := range addrs {
-			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && !ipnet.IP.IsMulticast() && !ipnet.IP.IsLinkLocalUnicast() && !ipnet.IP.IsLinkLocalMulticast() && ipnet.IP.To4() != nil {
-				ip = ipnet.IP.String()
+func (p *program) stopHTTP() (err error) {
+	if p.httpServer == nil {
+		err = fmt.Errorf("HTTP Server Not Found")
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err = p.httpServer.Shutdown(ctx); err != nil {
+		return
+	}
+	return
+}
+
+func (p *program) startHTTP() (err error) {
+	p.httpServer = &http.Server{
+		Addr:              fmt.Sprintf(":%d", p.httpPort),
+		Handler:           api.GetRouter(),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	link := fmt.Sprintf("http://%s:%d", utils.LocalIP(), p.httpPort)
+	log.Println("http server started -->", link)
+	go func() {
+		defer func() {
+			if p := recover(); p != nil {
+				log.Printf("http panic ocurs:%v", p)
 			}
+		}()
+		if err := p.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Println("http server start failed", err)
 		}
-	}
-	return ip
+		log.Println("http server stopped")
+	}()
+	return
 }
 
-func isPortInUse(port int) bool {
-	if conn, err := net.DialTimeout("tcp", net.JoinHostPort("", fmt.Sprintf("%d", port)), 3*time.Second); err == nil {
-		conn.Close()
-		return true
-	}
-	return false
-}
-
-func (p *program) StartRTSP() (err error) {
+func (p *program) startRTSP() (err error) {
 	if p.rtspServer == nil {
 		err = fmt.Errorf("RTSP Server Not Found")
 		return
@@ -49,18 +73,18 @@ func (p *program) StartRTSP() (err error) {
 	if p.rtspPort != 554 {
 		sport = fmt.Sprintf(":%d", p.rtspPort)
 	}
-	link := fmt.Sprintf("rtsp://%s%s", localIP(), sport)
+	link := fmt.Sprintf("rtsp://%s%s", utils.LocalIP(), sport)
 	log.Println("rtsp server started -->", link)
 	go func() {
 		if err := p.rtspServer.Start(); err != nil {
-			log.Println("start rtsp server error", err)
+			log.Println("rtsp server start failed", err)
 		}
 		log.Println("rtsp server stopped")
 	}()
 	return
 }
 
-func (p *program) StopRTSP() (err error) {
+func (p *program) stopRTSP() (err error) {
 	if p.rtspServer == nil {
 		err = fmt.Errorf("RTSP Server Not Found")
 		return
@@ -76,14 +100,15 @@ type stream struct {
 	HeartbeatInterval int
 }
 
-func (p *program) Start() (err error) {
+func (p *program) start() (err error) {
 	log.Println("********** START **********")
-	if isPortInUse(p.rtspPort) {
+	if utils.IsPortInUse(p.rtspPort) {
 		err = fmt.Errorf("RTSP port[%d] In Use", p.rtspPort)
 		return
 	}
 
-	p.StartRTSP()
+	p.startRTSP()
+	p.startHTTP()
 
 	log.SetOutput(os.Stdout)
 
@@ -128,9 +153,10 @@ func (p *program) Start() (err error) {
 	return
 }
 
-func (p *program) Stop() (err error) {
+func (p *program) stop() (err error) {
 	defer log.Println("********** STOP **********")
-	p.StopRTSP()
+	p.stopHTTP()
+	p.stopRTSP()
 	return
 }
 
@@ -146,8 +172,9 @@ func main() {
 	p := &program{
 		rtspPort:   rtspServer.TCPPort,
 		rtspServer: rtspServer,
+		httpPort:   8080,
 	}
-	p.Start()
+	p.start()
 
 	select {}
 }

@@ -21,7 +21,7 @@ type Server struct {
 }
 
 // Instance server instance
-var Instance = &Server{
+var instance = &Server{
 	SessionLogger:  SessionLogger{log.New(os.Stdout, "[RTSPServer]", log.LstdFlags|log.Lshortfile)},
 	Stoped:         true,
 	TCPPort:        554,
@@ -32,7 +32,7 @@ var Instance = &Server{
 
 // GetServer get instance
 func GetServer() *Server {
-	return Instance
+	return instance
 }
 
 // Start server
@@ -64,7 +64,7 @@ func (server *Server) Start() (err error) {
 
 	server.Stoped = false
 	server.TCPListener = listener
-	logger.Println("rtsp server start on", server.TCPPort)
+	logger.Println("started on", server.TCPPort)
 	networkBuffer := 1048576 //Key("network_buffer").MustInt(1048576)
 	for !server.Stoped {
 		conn, err := server.TCPListener.Accept()
